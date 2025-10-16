@@ -7,7 +7,8 @@ import {
   getDocs, 
   query, 
   orderBy,
-  where 
+  where,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -19,6 +20,11 @@ export interface Employee {
   department: string;
   salary: number;
   hireDate: string;
+  // Optional extended fields
+  address?: string;
+  dob?: string; // ISO date string
+  skill?: string;
+  nationality?: string;
 }
 
 export const employeeService = {
@@ -55,6 +61,14 @@ export const employeeService = {
       id: doc.id,
       ...doc.data()
     })) as Employee[];
+  },
+
+  // Get employee by id
+  getEmployeeById: async (id: string): Promise<Employee | null> => {
+    const ref = doc(db, 'employees', id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...(snap.data() as Omit<Employee, 'id'>) };
   },
 
   // Update an employee

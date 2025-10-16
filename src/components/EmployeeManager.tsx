@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import StepperProgress from '@/components/ui/stepper';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Users } from 'lucide-react';
+import { Plus, Trash2, Users, Eye } from 'lucide-react';
 
 const EmployeeManager: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -16,6 +17,7 @@ const EmployeeManager: React.FC = () => {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
+  // details handled via routing
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -24,6 +26,7 @@ const EmployeeManager: React.FC = () => {
     salary: 0,
     hireDate: ''
   });
+  const [currentStep, setCurrentStep] = useState(1);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,6 +47,16 @@ const EmployeeManager: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Multi-step flow: advance from step 1 to 2; submit on step 2
+    if (!editingEmployee && currentStep === 1) {
+      if (!formData.name || !formData.email) {
+        toast({ title: 'Missing info', description: 'Please enter first and last name and email', variant: 'destructive' });
+        return;
+      }
+      setCurrentStep(2);
+      return;
+    }
+
     try {
       setError('');
       
@@ -71,6 +84,7 @@ const EmployeeManager: React.FC = () => {
         salary: 0,
         hireDate: ''
       });
+      setCurrentStep(1);
       loadEmployees();
     } catch (error: any) {
       if (error.message.includes('email already exists')) {
@@ -90,18 +104,7 @@ const EmployeeManager: React.FC = () => {
     }
   };
 
-  const handleEdit = (employee: Employee) => {
-    setEditingEmployee(employee);
-    setFormData({
-      name: employee.name,
-      email: employee.email,
-      position: employee.position,
-      department: employee.department,
-      salary: employee.salary,
-      hireDate: employee.hireDate
-    });
-    setShowForm(true);
-  };
+  // edit from list no longer used; editing from details page
 
   const handleDeleteClick = (id: string) => {
     setEmployeeToDelete(id);
@@ -146,6 +149,11 @@ const EmployeeManager: React.FC = () => {
       salary: 0,
       hireDate: ''
     });
+    setCurrentStep(1);
+  };
+
+  const handleView = (employee: Employee) => {
+    window.location.hash = `#/employees/${encodeURIComponent(employee.id || '')}`;
   };
 
   if (loading) {
@@ -162,7 +170,7 @@ const EmployeeManager: React.FC = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-end">
-        <Button onClick={() => setShowForm(true)} className="gap-2">
+        <Button onClick={() => setShowForm(true)} className="gap-2 bg-gray-900 text-white hover:bg-gray-800">
           <Plus className="h-4 w-4" />
           Add Employee
         </Button>
@@ -179,92 +187,107 @@ const EmployeeManager: React.FC = () => {
           <DialogHeader>
             <DialogTitle>{editingEmployee ? 'Update Employee' : 'Add Employee'}</DialogTitle>
             <DialogDescription>
-              {editingEmployee ? 'Update employee information' : 'Enter the details for the new employee'}
+              {editingEmployee ? 'Update employee information' : 'Follow the steps to add a new employee'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="name" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Name
-                </label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Enter full name"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter email address"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="position" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Position
-                </label>
-                <Input
-                  id="position"
-                  value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  placeholder="Enter job position"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="department" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Department
-                </label>
-                <Input
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  placeholder="Enter department"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="salary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Salary
-                </label>
-                <Input
-                  id="salary"
-                  type="number"
-                  value={formData.salary}
-                  onChange={(e) => setFormData({ ...formData, salary: Number(e.target.value) })}
-                  placeholder="Enter salary"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="hireDate" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Hire Date
-                </label>
-                <Input
-                  id="hireDate"
-                  type="date"
-                  value={formData.hireDate}
-                  onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
-                  required
-                />
-              </div>
+          {!editingEmployee && (
+            <div className="mb-4">
+              <StepperProgress steps={["Basic Info", "Job Details"]} currentStep={currentStep} />
             </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {editingEmployee || currentStep === 2 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label htmlFor="position" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Position
+                  </label>
+                  <Input
+                    id="position"
+                    value={formData.position}
+                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    placeholder="Enter job position"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="department" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Department
+                  </label>
+                  <Input
+                    id="department"
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    placeholder="Enter department"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="salary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Salary
+                  </label>
+                  <Input
+                    id="salary"
+                    type="number"
+                    value={formData.salary}
+                    onChange={(e) => setFormData({ ...formData, salary: Number(e.target.value) })}
+                    placeholder="Enter salary"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="hireDate" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Hire Date
+                  </label>
+                  <Input
+                    id="hireDate"
+                    type="date"
+                    value={formData.hireDate}
+                    onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 md:col-span-1 col-span-1">
+                  <label htmlFor="name" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Full Name
+                  </label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Enter first and last name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Email
+                  </label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="Enter email address"
+                    required
+                  />
+                </div>
+              </div>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button type="submit">
-                {editingEmployee ? 'Update' : 'Add'} Employee
+              {!editingEmployee && currentStep === 2 && (
+                <Button type="button" variant="secondary" onClick={() => setCurrentStep(1)}>
+                  Back
+                </Button>
+              )}
+              <Button type="submit" className='bg-gray-900 text-white hover:bg-gray-800'>
+                {editingEmployee ? 'Update Employee' : currentStep === 1 ? 'Continue' : 'Create Employee'}
               </Button>
             </DialogFooter>
           </form>
@@ -287,7 +310,7 @@ const EmployeeManager: React.FC = () => {
               <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold mb-2">No employees yet</h3>
               <p className="text-muted-foreground mb-4">Get started by adding your first employee.</p>
-              <Button onClick={() => setShowForm(true)} className="gap-2">
+              <Button onClick={() => setShowForm(true)} className="gap-2 bg-gray-900 text-white hover:bg-gray-800">
                 <Plus className="h-4 w-4" />
                 Add Employee
               </Button>
@@ -319,11 +342,11 @@ const EmployeeManager: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEdit(employee)}
+                          onClick={() => handleView(employee)}
                           className="gap-1"
                         >
-                          <Edit className="h-3 w-3" />
-                          Edit
+                          <Eye className="h-3 w-3" />
+                          View
                         </Button>
                         <Button
                           variant="destructive"
@@ -343,6 +366,8 @@ const EmployeeManager: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Details modal removed; use dedicated page via hash routing */}
 
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
         <DialogContent>
