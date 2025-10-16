@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { employeeService, type Employee } from '../services/employeeService';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { Plus, Edit, Trash2, Users } from 'lucide-react';
 
 const EmployeeManager: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -7,6 +14,8 @@ const EmployeeManager: React.FC = () => {
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -15,6 +24,7 @@ const EmployeeManager: React.FC = () => {
     salary: 0,
     hireDate: ''
   });
+  const { toast } = useToast();
 
   useEffect(() => {
     loadEmployees();
@@ -39,8 +49,16 @@ const EmployeeManager: React.FC = () => {
       
       if (editingEmployee) {
         await employeeService.updateEmployee(editingEmployee.id!, formData);
+        toast({
+          title: "Success",
+          description: "Employee updated successfully!",
+        });
       } else {
         await employeeService.createEmployee(formData);
+        toast({
+          title: "Success",
+          description: "Employee added successfully!",
+        });
       }
       
       setShowForm(false);
@@ -55,7 +73,20 @@ const EmployeeManager: React.FC = () => {
       });
       loadEmployees();
     } catch (error: any) {
-      setError('Failed to save employee: ' + error.message);
+      if (error.message.includes('email already exists')) {
+        toast({
+          title: "Error",
+          description: "An employee with this email already exists!",
+          variant: "destructive",
+        });
+      } else {
+        setError('Failed to save employee: ' + error.message);
+        toast({
+          title: "Error",
+          description: "Failed to save employee: " + error.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -72,15 +103,36 @@ const EmployeeManager: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
+  const handleDeleteClick = (id: string) => {
+    setEmployeeToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (employeeToDelete) {
       try {
-        await employeeService.deleteEmployee(id);
+        await employeeService.deleteEmployee(employeeToDelete);
+        toast({
+          title: "Success",
+          description: "Employee deleted successfully!",
+        });
         loadEmployees();
       } catch (error: any) {
         setError('Failed to delete employee: ' + error.message);
+        toast({
+          title: "Error",
+          description: "Failed to delete employee: " + error.message,
+          variant: "destructive",
+        });
       }
     }
+    setShowDeleteModal(false);
+    setEmployeeToDelete(null);
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setEmployeeToDelete(null);
   };
 
   const handleCancel = () => {
@@ -97,146 +149,219 @@ const EmployeeManager: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="loading">Loading employees...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-pulse" />
+          <p className="text-lg text-muted-foreground">Loading employees...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="employee-manager">
-      <div className="employee-header">
-        <h2>Employee Management</h2>
-        <button 
-          onClick={() => setShowForm(true)} 
-          className="add-button"
-        >
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-end">
+        <Button onClick={() => setShowForm(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
           Add Employee
-        </button>
+        </Button>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && (
+        <div className="bg-destructive/15 text-destructive px-4 py-3 rounded-md border border-destructive/20">
+          {error}
+        </div>
+      )}
 
-      {showForm && (
-        <div className="employee-form-container">
-          <div className="employee-form">
-            <h3>{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</h3>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="name">Name</label>
-                <input
-                  type="text"
+      <Dialog open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) handleCancel(); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingEmployee ? 'Update Employee' : 'Add Employee'}</DialogTitle>
+            <DialogDescription>
+              {editingEmployee ? 'Update employee information' : 'Enter the details for the new employee'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="name" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Name
+                </label>
+                <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter full name"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="email">Email</label>
-                <input
-                  type="email"
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Email
+                </label>
+                <Input
                   id="email"
+                  type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Enter email address"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="position">Position</label>
-                <input
-                  type="text"
+              <div className="space-y-2">
+                <label htmlFor="position" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Position
+                </label>
+                <Input
                   id="position"
                   value={formData.position}
                   onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                  placeholder="Enter job position"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="department">Department</label>
-                <input
-                  type="text"
+              <div className="space-y-2">
+                <label htmlFor="department" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Department
+                </label>
+                <Input
                   id="department"
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                  placeholder="Enter department"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="salary">Salary</label>
-                <input
-                  type="number"
+              <div className="space-y-2">
+                <label htmlFor="salary" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Salary
+                </label>
+                <Input
                   id="salary"
+                  type="number"
                   value={formData.salary}
                   onChange={(e) => setFormData({ ...formData, salary: Number(e.target.value) })}
+                  placeholder="Enter salary"
                   required
                 />
               </div>
-              <div className="form-group">
-                <label htmlFor="hireDate">Hire Date</label>
-                <input
-                  type="date"
+              <div className="space-y-2">
+                <label htmlFor="hireDate" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Hire Date
+                </label>
+                <Input
                   id="hireDate"
+                  type="date"
                   value={formData.hireDate}
                   onChange={(e) => setFormData({ ...formData, hireDate: e.target.value })}
                   required
                 />
               </div>
-              <div className="form-actions">
-                <button type="submit" className="save-button">
-                  {editingEmployee ? 'Update' : 'Add'} Employee
-                </button>
-                <button type="button" onClick={handleCancel} className="cancel-button">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {editingEmployee ? 'Update' : 'Add'} Employee
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      <div className="employee-list">
-        {employees.length === 0 ? (
-          <p className="no-employees">No employees found. Add your first employee!</p>
-        ) : (
-          <table className="employee-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Position</th>
-                <th>Department</th>
-                <th>Salary</th>
-                <th>Hire Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((employee) => (
-                <tr key={employee.id}>
-                  <td>{employee.name}</td>
-                  <td>{employee.email}</td>
-                  <td>{employee.position}</td>
-                  <td>{employee.department}</td>
-                  <td>${employee.salary.toLocaleString()}</td>
-                  <td>{new Date(employee.hireDate).toLocaleDateString()}</td>
-                  <td>
-                    <button 
-                      onClick={() => handleEdit(employee)} 
-                      className="edit-button"
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(employee.id!)} 
-                      className="delete-button"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Employees</CardTitle>
+          <CardDescription>
+            {employees.length === 0 
+              ? "No employees found. Add your first employee!" 
+              : `Manage your ${employees.length} employee${employees.length === 1 ? '' : 's'}`
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {employees.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">No employees yet</h3>
+              <p className="text-muted-foreground mb-4">Get started by adding your first employee.</p>
+              <Button onClick={() => setShowForm(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Employee
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Salary</TableHead>
+                  <TableHead>Hire Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {employees.map((employee) => (
+                  <TableRow key={employee.id}>
+                    <TableCell className="font-medium">{employee.name}</TableCell>
+                    <TableCell>{employee.email}</TableCell>
+                    <TableCell>{employee.position}</TableCell>
+                    <TableCell>{employee.department}</TableCell>
+                    <TableCell>${employee.salary.toLocaleString()}</TableCell>
+                    <TableCell>{new Date(employee.hireDate).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(employee)}
+                          className="gap-1"
+                        >
+                          <Edit className="h-3 w-3" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteClick(employee.id!)}
+                          className="gap-1"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Employee</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this employee? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDeleteCancel}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

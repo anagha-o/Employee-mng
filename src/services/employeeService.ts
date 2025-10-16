@@ -6,7 +6,8 @@ import {
   doc, 
   getDocs, 
   query, 
-  orderBy 
+  orderBy,
+  where 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -21,8 +22,27 @@ export interface Employee {
 }
 
 export const employeeService = {
+  // Check if email already exists
+  checkEmailExists: async (email: string, excludeId?: string): Promise<boolean> => {
+    const q = query(collection(db, 'employees'), where('email', '==', email));
+    const querySnapshot = await getDocs(q);
+    
+    // If we're updating an employee, exclude the current employee from the check
+    if (excludeId) {
+      return querySnapshot.docs.some(doc => doc.id !== excludeId);
+    }
+    
+    return !querySnapshot.empty;
+  },
+
   // Create a new employee
   createEmployee: async (employee: Omit<Employee, 'id'>): Promise<string> => {
+    // Check if email already exists
+    const emailExists = await employeeService.checkEmailExists(employee.email);
+    if (emailExists) {
+      throw new Error('An employee with this email already exists');
+    }
+    
     const docRef = await addDoc(collection(db, 'employees'), employee);
     return docRef.id;
   },
@@ -39,6 +59,14 @@ export const employeeService = {
 
   // Update an employee
   updateEmployee: async (id: string, employee: Partial<Employee>): Promise<void> => {
+    // Check if email already exists (excluding current employee)
+    if (employee.email) {
+      const emailExists = await employeeService.checkEmailExists(employee.email, id);
+      if (emailExists) {
+        throw new Error('An employee with this email already exists');
+      }
+    }
+    
     const employeeRef = doc(db, 'employees', id);
     await updateDoc(employeeRef, employee);
   },

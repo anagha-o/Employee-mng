@@ -1,5 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Toaster } from '@/components/ui/toaster';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import './App.css';
@@ -18,6 +19,7 @@ function App() {
   return (
     <AuthProvider>
       <AppContent />
+      <Toaster />
     </AuthProvider>
   );
 }
